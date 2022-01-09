@@ -4,7 +4,7 @@ databaseChangeLog:
       author: cohuebn
       changes:
       - createTable:
-          tableName: person
+          tableName: budget
           columns:
           - column:
               name: id
@@ -14,5 +14,5 @@ databaseChangeLog:
                 primaryKey: true
                 nullable: false
           - column:
-              name: firstname
+              name: name
               type: varchar(50)

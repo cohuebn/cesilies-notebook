@@ -29,7 +29,7 @@ fi
 
 # Run a sql command to check if each node in the cluster has been initialized; if not initialize it
 for db_node in $db_nodes; do
-    echo "DB node: $db_node"
+    echo "Ensuring DB node $db_node is initialized"
     cockroach sql --certs-dir="$certs_dir" --host "$db_node" --execute="select 1" \
         || cockroach init --certs-dir="$certs_dir" --host "$db_node"
 done
