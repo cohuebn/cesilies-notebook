@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+  # Node 1 of the DB cluster
+  db-1:
+    container_name: db-1
+    image: cockroachdb/cockroach:v21.2.3
+    volumes:
+      - ${PWD}/.data/db-1:/cockroach/cockroach-data
+      - ${PWD}/local/start-local-db.sh:/local/start-local-db.sh:ro
+      - ${PWD}/local/db-ca/ca.crt:/local/db-ca/ca.crt:ro
+      - ${PWD}/local/db-ca/ca.local.key:/local/db-ca/ca.local.key:ro
+    entrypoint: /local/start-local-db.sh
+    command: db-1 /local/db-ca/ /local/db-ca/ca.local.key db-1,db-2
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    networks:
+      ces-notebook-network:
+        aliases:
+          - db-1
+  # Node 2 of the DB cluster
+  db-2:
+    container_name: db-2
+    image: cockroachdb/cockroach:v21.2.3
+    volumes:
+      - ${PWD}/.data/db-2:/cockroach/cockroach-data
+      - ${PWD}/local/start-local-db.sh:/local/start-local-db.sh:ro
+      - ${PWD}/local/db-ca/ca.crt:/local/db-ca/ca.crt:ro
+      - ${PWD}/local/db-ca/ca.local.key:/local/db-ca/ca.local.key:ro
+    entrypoint: /local/start-local-db.sh
+    command: db-2 /local/db-ca/ /local/db-ca/ca.local.key db-1,db-2
+    networks:
+      ces-notebook-network:
+        aliases:
+          - db-2
+  db-schema-evolution:
+    depends_on:
+      - db-1
+      - db-2
+    build:
+      dockerfile: database/schema-evolution.Dockerfile
+      args:
+        cockroachVersion: "21.2.3"
+        changelogPath: /database/schema-evolution
+    networks:
+      ces-notebook-network: {}
+    volumes:
+      - ${PWD}/database/:/liquibase/database
+      - ${PWD}/local/db-ca/ca.crt:/liquibase/certs/ca.crt
+      - ${PWD}/local/db-ca/ca.local.key:/liquibase/certs/ca.local.key
+    entrypoint: "/bin/bash"
+    command:
+      - /liquibase/database/run-schema-evolution.sh
+      - db-1,db-2
+      - "26257"
+      - /liquibase/certs/
+      - cesilies_notebook
+      - cesilies_notebook_deploy_service
+      - thePassword
+      - database/schema-evolution/changelog.yaml
+networks:
+  ces-notebook-network:
+    driver: bridge

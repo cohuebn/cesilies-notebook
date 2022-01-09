@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id:  1
+      author: cohuebn
+      changes:
+      - createTable:
+          tableName: person
+          columns:
+          - column:
+              name: id
+              type: int
+              autoIncrement: true
+              constraints:
+                primaryKey: true
+                nullable: false
+          - column:
+              name: firstname
+              type: varchar(50)
