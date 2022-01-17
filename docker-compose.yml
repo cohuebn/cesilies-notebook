@@ -54,7 +54,7 @@ services:
       - /liquibase/database/run-schema-evolution.sh
       - db-1,db-2
       - "26257"
-      - /liquibase/certs/
+      - /liquibase/certs
       - cesilies_notebook
       - cesilies_notebook_deploy_service
       - thePassword

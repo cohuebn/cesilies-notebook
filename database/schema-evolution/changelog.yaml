@@ -1,18 +1,4 @@
 databaseChangeLog:
-  - changeSet:
-      id:  1
-      author: cohuebn
-      changes:
-      - createTable:
-          tableName: budget
-          columns:
-          - column:
-              name: id
-              type: int
-              autoIncrement: true
-              constraints:
-                primaryKey: true
-                nullable: false
-          - column:
-              name: name
-              type: varchar(50)
+  - includeAll:
+      path: changesets
+      relativeToChangelogFile: true

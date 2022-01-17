@@ -1,51 +1,64 @@
 #!/usr/bin/env bash
 
-split_on_commas() {
-    local original_ifs=$IFS
+splitOnCommas() {
+    local originalIfs=$IFS
     IFS=,
     local items=($1)
     for item in "${items[@]}"; do
         echo "$item"
     done
-    IFS=$original_ifs
+    IFS=$originalIfs
 }
-db_nodes=($(split_on_commas $1))
-db_port=$2
-certs_dir=$3
-db_name=$4
-service_user=$5
-service_user_password=$6
-changelog_path=$7
+dbNodes=($(splitOnCommas $1))
+dbPort=$2
+certsDir=$3
+dbName=$4
+serviceUser=$5
+serviceUserPassword=$6
+changelogPath=$7
 
 # Validate inputs
-if [ ${#db_nodes[@]} -eq 0 ]; then
+if [ ${#dbNodes[@]} -eq 0 ]; then
     echo "No database nodes provided; cannot run without any database nodes"
     exit 1
 fi
 
+dbObjectPattern='^([0-9a-z]+_*)*[0-9a-z]+$'
+if ! [[ $dbName =~ $dbObjectPattern ]]; then
+    echo "Database name must be all-lowercase letters (a-z, 0-9, and underscore allowed]"
+    exit 1
+fi
+
+if ! [[ $serviceUser =~ $dbObjectPattern ]]; then
+    echo "Service user must be all-lowercase letters (a-z, 0-9, and underscore allowed]"
+    exit 1
+fi
+
 # Create the root and service user's certs
-[ ! -f "$certs_dir/client.root.crt" ] && cockroach cert create-client root --ca-key="$certs_dir/ca.local.key" --certs-dir=$certs_dir
-[ ! -f "$certs_dir/client.$service_user.crt" ] && cockroach cert create-client $service_user --ca-key="$certs_dir/ca.local.key" --certs-dir=$certs_dir --also-generate-pkcs8-key
+[ ! -f "$certsDir/client.root.crt" ] && cockroach cert create-client root --ca-key="$certsDir/ca.local.key" --certs-dir=$certsDir
+[ ! -f "$certsDir/client.$serviceUser.crt" ] && cockroach cert create-client $serviceUser --ca-key="$certsDir/ca.local.key" --certs-dir=$certsDir --also-generate-pkcs8-key
 
 # Run a sql command to check if each node in the cluster has been initialized; if not initialize it
-for db_node in $db_nodes; do
-    echo "Ensuring DB node $db_node is initialized"
-    cockroach sql --certs-dir="$certs_dir" --host "$db_node" --execute="select 1" \
-        || cockroach init --certs-dir="$certs_dir" --host "$db_node"
+for dbNode in $dbNodes; do
+    echo "Ensuring DB node $dbNode is initialized"
+    cockroach sql --certs-dir="$certsDir" --host "$dbNode" --execute="select 1" \
+        || cockroach init --certs-dir="$certsDir" --host "$dbNode"
 done
 
 # Ensure the database and schema migration user exist to allow further schema evolution
-db_init_sql=$(cat <<EOF
-CREATE DATABASE IF NOT EXISTS $db_name;
-CREATE ROLE IF NOT EXISTS cesilies_notebook_deployer WITH CREATEDB;
-GRANT ALL ON DATABASE $db_name TO cesilies_notebook_deployer;
-CREATE USER IF NOT EXISTS $service_user WITH PASSWORD '$service_user_password';
-GRANT cesilies_notebook_deployer TO $service_user;
+deployerRole='cesilies_notebook_deployer'
+dbInitSql=$(cat <<EOF
+CREATE DATABASE IF NOT EXISTS $dbName;
+CREATE ROLE IF NOT EXISTS $deployerRole WITH CREATEDB;
+GRANT ALL ON DATABASE $dbName TO $deployerRole;
+CREATE USER IF NOT EXISTS $serviceUser WITH PASSWORD '$serviceUserPassword';
+GRANT $deployerRole TO $serviceUser;
 EOF
 )
-first_db_node=${db_nodes[0]}
-echo "Running migrations against db node: $first_db_node"
-cockroach sql --certs-dir="$certs_dir" --host "$first_db_node" --execute "$db_init_sql"
+firstDbNode=${dbNodes[0]}
+echo "Running migrations against db node: $firstDbNode"
+cockroach sql --certs-dir="$certsDir" --host "$firstDbNode" --execute "$dbInitSql"
 
-db_url="jdbc:postgresql://$first_db_node:$db_port/$db_name?sslmode=verify-full&sslrootcert=$certs_dir/ca.crt&sslkey=$certs_dir/client.$service_user.key.pk8&sslcert=$certs_dir/client.$service_user.crt"
-liquibase --changelog-file="$changelog_path" --url="$db_url" --username="$service_user" update
+dbUrl="jdbc:postgresql://$firstDbNode:$dbPort/$dbName?sslmode=verify-full&sslrootcert=$certsDir/ca.crt&sslkey=$certsDir/client.$serviceUser.key.pk8&sslcert=$certsDir/client.$serviceUser.crt"
+echo "Running Liquibase using DB URL: $dbUrl"
+liquibase --changelog-file="$changelogPath" --url="$dbUrl" --username="$serviceUser" update
