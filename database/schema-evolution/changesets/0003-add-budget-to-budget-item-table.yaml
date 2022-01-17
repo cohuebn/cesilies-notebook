@@ -1,0 +1,31 @@
+databaseChangeLog:
+  - changeSet:
+      id:  3
+      author: cohuebn
+      changes:
+      - createTable:
+          tableName: budget_to_budget_item
+          columns:
+          - column:
+              name: id
+              type: int
+              autoIncrement: true
+              constraints:
+                primaryKey: true
+                nullable: false
+          - column:
+              name: budget_id
+              type: int
+              autoIncrement: true
+              constraints:
+                foreignKeyName: "fk_budget_to_budget_item_budget"
+                references: budget(id)
+                nullable: false
+          - column:
+              name: budget_item_id
+              type: int
+              autoIncrement: true
+              constraints:
+                foreignKeyName: "fk_budget_to_budget_item_budget_item"
+                references: budget_item(id)
+                nullable: false
